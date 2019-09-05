@@ -4,6 +4,7 @@ import os
 
 import pytest
 import gevent
+import urllib3
 
 from gnsq import NsqdHTTPClient, Producer
 from gnsq.errors import NSQException, NSQNoConnections, NSQInvalid
@@ -108,6 +109,41 @@ def test_publish_error():
 
         producer.close()
         producer.join()
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(SLOW_TIMEOUT)
+def test_tls_publish():
+    extra_params = [
+        '--tls-required', 'true',
+        '--https-address', '127.0.0.1:4152',
+    ]
+    with NsqdIntegrationServer(extra_params=extra_params) as server:
+        producer = Producer(
+            server.tcp_address,
+            tls_options={
+                'keyfile': server.tls_key,
+                'certfile': server.tls_cert,
+            },
+            tls_v1=True,
+        )
+        producer.start()
+
+        for _ in range(100):
+            producer.publish('test', b'hi')
+
+        producer.close()
+        producer.join()
+
+        conn = NsqdHTTPClient(
+            server.address,
+            '4152',
+            connection_class=urllib3.HTTPSConnectionPool,
+            cert_reqs='CERT_NONE',
+        )
+        stats = conn.stats()
+
+        assert stats['topics'][0]['depth'] == 100
 
 
 def test_not_running():

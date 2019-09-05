@@ -211,8 +211,9 @@ class Producer(object):
         self.logger.debug('[%s] response: %s', conn, response)
 
         if response == nsq.OK:
-            result = self._response_queues[conn].popleft()
-            result.set(response)
+            if conn in self._response_queues:
+                result = self._response_queues[conn].popleft()
+                result.set(response)
 
         self.on_response.send(self, response=response)
 

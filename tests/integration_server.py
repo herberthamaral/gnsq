@@ -15,7 +15,7 @@ class BaseIntegrationServer(object):
     protocol_re = re.compile(' '.join([
         r'(?P<protocol>[A-Z]+):',
         r'listening on',
-        r'(?P<address>(?:[0-9]{1,3}\.){3}[0-9]{1,3}):(?P<port>[0-9]+)',
+        r'(?P<address>((?:[0-9]{1,3}\.){3}[0-9]{1,3}|(\[\:\:\]))):(?P<port>[0-9]+)',
     ]))
 
     version_re = re.compile(' '.join([
@@ -116,13 +116,14 @@ class NsqdIntegrationServer(BaseIntegrationServer):
     tls_cert = os.path.join(os.path.dirname(__file__), 'cert.pem')
     tls_key = os.path.join(os.path.dirname(__file__), 'key.pem')
 
-    def __init__(self, lookupd=None, **kwargs):
+    def __init__(self, lookupd=None, extra_params=[], **kwargs):
         super(NsqdIntegrationServer, self).__init__(**kwargs)
 
         if self.has_https():
             self.protocols = ('TCP', 'HTTP', 'HTTPS')
 
         self.lookupd = lookupd
+        self.extra_params = extra_params
 
     def has_https(self):
         return self.version >= (0, 2, 28)
@@ -146,8 +147,9 @@ class NsqdIntegrationServer(BaseIntegrationServer):
             '--tls-cert', self.tls_cert,
             '--tls-key', self.tls_key,
         ]
+        cmd.extend(self.extra_params)
 
-        if self.has_https():
+        if self.has_https() and '--https-address' not in cmd:
             cmd.extend(['--https-address', self._random_address()])
 
         if self.lookupd:
